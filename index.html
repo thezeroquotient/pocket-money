@@ -169,12 +169,6 @@ pre{font:11px/1.45 ui-monospace,Menlo,monospace;background:var(--bg);border:1px 
 <div id="layer"></div>
 
 <script>
-/* ---------- Family sync (optional) ----------
-   Paste your Firebase web config here, or paste it in the app under Settings → Family sync.
-   Setup steps are in README.md. */
-const FIREBASE_CONFIG = null;
-const FB_VER = '10.12.2';
-
 /* ---------- constants ---------- */
 const KEY = 'pm_state_v1', PREFS = 'pm_prefs_v1';
 const EXP_TAGS = [['food','🍔','Food'],['stationery','✏️','Stationery'],['sports','⚽','Sports'],['shopping','🛍️','Shopping'],['study','📚','Study'],['others','📦','Others']];
@@ -186,7 +180,7 @@ function readJSON(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e)
 function writeJSON(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 let S = readJSON(KEY);
 if (S && !S.v) S = null;
-let P = Object.assign({theme:'system', accent:'mint', device:''}, readJSON(PREFS) || {});
+let P = Object.assign({theme:'system', accent:'mint'}, readJSON(PREFS) || {});
 const save = () => writeJSON(KEY, S);
 const savePrefs = () => writeJSON(PREFS, P);
 let ui = {tab:'home', expMode:'expense', savMode:'jar', calMonth:null, form:null};
@@ -309,21 +303,16 @@ function txRow(t){
   const [e, label] = tagInfo(t);
   const sign = (t.type==='expense' || t.type==='toSavings') ? '−' : '+';
   const cls = t.type==='income' ? 'pos' : '';
-  const sub = [fmtDate(t.date), t.desc ? label : '', t.by].filter(Boolean).join(' · ');
+  const sub = [fmtDate(t.date), t.desc ? label : ''].filter(Boolean).join(' · ');
   const click = (t.type==='expense'||t.type==='income') ? `txSheet('${t.id}')` : `transferEdit('${t.id}')`;
   return `<div class="tx" onclick="${click}"><div class="ic">${e}</div><div class="mid"><div class="t1">${esc(t.desc || label)}</div><div class="t2">${esc(sub)}</div></div><div class="amt ${cls}">${sign}${fmt(t.amount)}</div></div>`;
-}
-function syncPill(){
-  if (!fbCfg()) return '';
-  if (fuser) return `<button class="pill on" onclick="go('settings')">● Synced</button>`;
-  return `<button class="pill" onclick="go('settings')">○ Not synced</button>`;
 }
 
 function viewHome(c){
   const n = c.next, pct = Math.min(100, n.spent / Math.max(1,n.budget) * 100);
   const recent = [...S.tx].sort(byDate).slice(0,5);
   return `
-  <div class="top"><div><div class="hello">Hi${S.name ? ', '+esc(S.name) : ''} 👋</div><div class="muted sm">${monthName(c.cur,true)}</div></div>${syncPill()}</div>
+  <div class="top"><div><div class="hello">Hi${S.name ? ', '+esc(S.name) : ''} 👋</div><div class="muted sm">${monthName(c.cur,true)}</div></div></div>
   <div class="card">
     <div class="label">Main balance</div>
     <div class="bal ${c.main<0?'neg':''}">${fmt(c.main)}</div>
@@ -461,13 +450,6 @@ function dayInfo(ds){
 function viewSettings(){
   const cur = ym(today()), pNow = planAt(cur), pNext = planAt(addMonth(cur,1));
   const changed = pNext.from > cur ? `<div class="muted sm" style="padding:0 16px 12px">From ${monthName(pNext.from)}: ${fmt(pNext.base)} · ${pNext.mult}×</div>` : '';
-  const sync = fbCfg()
-    ? (fuser
-      ? `<div class="srow"><div class="k">Signed in<small>${esc(fuser.email||'')}</small></div><button class="pill on">● Synced</button></div>
-         <div class="srow"><button class="btn" style="margin:0" onclick="signOut()">Sign out on this phone</button></div>`
-      : `<div class="srow"><button class="btn primary" style="margin:0" onclick="signIn()">Sign in with Google</button></div>`)
-      + `<div class="srow"><button class="link" onclick="syncSetup()">Change sync setup</button></div>`
-    : `<div class="srow"><div class="k">Not set up<small>Same Google account on every phone</small></div><button class="pill" onclick="syncSetup()">Set up</button></div>`;
   return `<div class="top"><h2>Settings</h2></div>
   <h3>Allowance plan <button class="i" onclick="explainPlan()">i</button></h3>
   <div class="card set">
@@ -480,7 +462,6 @@ function viewSettings(){
   <h3>You</h3>
   <div class="card set">
     <div class="srow"><div class="k">Your name</div><input class="inp" id="s-name" value="${esc(S.name||'')}" onchange="S.name=this.value.trim();putMeta()"></div>
-    <div class="srow"><div class="k">This phone is<small>Shown on entries</small></div><input class="inp" placeholder="e.g. Papa" value="${esc(P.device)}" onchange="P.device=this.value.trim();savePrefs()"></div>
     <div class="srow"><div class="k">Savings goal</div><input class="inp" type="number" inputmode="numeric" value="${S.goal||''}" onchange="S.goal=Math.max(0,+this.value||0);putMeta()"></div>
   </div>
   <h3>Colour theme</h3>
@@ -488,11 +469,9 @@ function viewSettings(){
     <div class="srow"><div class="k">Mode</div><select class="inp" onchange="P.theme=this.value;savePrefs();render()">${['system','light','dark'].map(x=>`<option ${P.theme===x?'selected':''} value="${x}">${x[0].toUpperCase()+x.slice(1)}</option>`).join('')}</select></div>
     <div class="srow"><div class="k">Accent</div><div class="swatches">${Object.entries(ACCENTS).map(([k,v])=>`<button class="sw ${P.accent===k?'on':''}" style="background:${v}" aria-label="${k}" onclick="P.accent='${k}';savePrefs();render()"></button>`).join('')}</div></div>
   </div>
-  <h3>Family sync</h3>
-  <div class="card set">${sync}</div>
-  <h3>Backup</h3>
+  <h3>Backup <button class="i" onclick="explainBackup()">i</button></h3>
   <div class="card set">
-    <div class="srow"><div class="btns" style="width:100%"><button class="btn" style="margin:0" onclick="exportBackup()">Export</button><button class="btn" style="margin:0" onclick="importSheet()">Import</button></div></div>
+    <div class="srow"><div class="btns" style="width:100%"><button class="btn primary" style="margin:0" onclick="shareData()">Save backup</button><button class="btn" style="margin:0" onclick="receiveSheet()">Restore</button></div></div>
   </div>
   <div class="card set"><div class="srow"><button class="btn danger" style="margin:0" onclick="resetAll()">Erase data on this phone</button></div></div>
   <p class="muted sm" style="text-align:center">Pocket Money · v1</p>`;
@@ -513,7 +492,7 @@ function viewSetup(){
       <div class="field"><label>Money in your savings account now</label><input class="inp" id="o-sav" type="number" inputmode="numeric" placeholder="0"></div>
       <button class="btn primary" onclick="finishSetup()">Start</button>
     </div>
-    ${fbCfg() ? `<button class="btn" onclick="signIn()">Already set up on another phone? Sign in</button>` : ''}
+    <button class="btn" onclick="receiveSheet()">Restore from a backup</button>
   </div>`;
 }
 function finishSetup(){
@@ -523,7 +502,7 @@ function finishSetup(){
   const cur = ym(today());
   S = {v:1, name:$('#o-name').value.trim(), startMonth:cur, startDate:today(),
        opening:{main:num('#o-main'), savings:num('#o-sav')}, openingSpent:num('#o-spent'),
-       plan:[{from:cur, base, mult:mult||2}], goal:10000, tx:[], updatedAt:Date.now()};
+       plan:[{from:cur, base, mult:mult||2}], goal:10000, tx:[], deleted:[], created:Date.now(), updatedAt:Date.now()};
   putMeta(); render();
 }
 
@@ -579,7 +558,7 @@ function saveTx(){
   if (date > today()) return toast("Date can't be in the future");
   if (!f.id && date < S.startDate) return toast(`Use a date from ${fmtDate(S.startDate)} on`);
   const old = f.id ? S.tx.find(x=>x.id===f.id) : null;
-  putTx({id:f.id||uid(), type:f.type, amount:r2(amt), desc:f.desc.trim().slice(0,80), tag:f.tag, date, ts:old?.ts||Date.now(), by:old?.by ?? P.device});
+  putTx({id:f.id||uid(), type:f.type, amount:r2(amt), desc:f.desc.trim().slice(0,80), tag:f.tag, date, ts:old?.ts||Date.now()});
   closeSheet(); render();
   const c = compute();
   toast(f.type==='expense' ? `Saved · next bonus ${fmt(c.next.bonus)}` : 'Income saved');
@@ -606,7 +585,7 @@ function saveTransfer(dir, id){
   const max = (dir==='toSavings' ? c.main : c.sav) + (old ? old.amount : 0);
   if (!(amt > 0)) return toast('Enter an amount');
   if (amt > max + 0.001) return toast(`Only ${fmt(max)} available`);
-  putTx({id:id||uid(), type:dir, amount:r2(amt), desc:$('#t-desc').value.trim().slice(0,80), tag:'', date:old?.date||today(), ts:old?.ts||Date.now(), by:old?.by ?? P.device});
+  putTx({id:id||uid(), type:dir, amount:r2(amt), desc:$('#t-desc').value.trim().slice(0,80), tag:'', date:old?.date||today(), ts:old?.ts||Date.now()});
   closeSheet(); render(); toast(dir==='toSavings' ? 'Moved to jar 🫙' : 'Moved to main');
 }
 
@@ -620,24 +599,25 @@ function savePlan(){
   putMeta(); render(); toast(from===cur ? 'Plan updated' : `Plan saved from ${monthName(from)}`);
 }
 function resetAll(){
-  if (!confirm('Erase all data on this phone? Export a backup first if you need one.')) return;
-  if (fuser) signOut();
-  localStorage.removeItem(KEY); localStorage.removeItem('pm_linked_uid'); S = null; ui.tab = 'home'; render();
+  if (!confirm('Erase all data on this phone? Save a backup first if you need one.')) return;
+  localStorage.removeItem(KEY); S = null; ui.tab = 'home'; render();
 }
 
-/* backup */
-function exportBackup(){
-  const data = JSON.stringify({app:'pocket-money', exported:new Date().toISOString(), state:S}, null, 2);
-  const name = `pocket-money-backup-${today()}.json`;
+/* ---------- backup ----------
+   Save backup shares the data as a file (WhatsApp, Drive, email). Restore merges a file back in:
+   entries are combined by id, the newer edit wins, and deletions travel along in S.deleted. */
+function shareData(){
+  const data = JSON.stringify({app:'pocket-money', exported:new Date().toISOString(), state:S});
+  const name = `pocket-money-${today()}.json`;
   let file;
   try { file = new File([data], name, {type:'application/json'}); } catch(e) {}
   if (file && navigator.canShare && navigator.canShare({files:[file]})){
-    navigator.share({files:[file], title:name}).catch(()=>{}); return;
+    navigator.share({files:[file], title:'Pocket Money'}).catch(()=>{}); return;
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([data], {type:'application/json'})); a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
-  sheet(`<h2>Backup</h2><p>If no file downloaded, copy this text and keep it safe.</p>
+  sheet(`<h2>Backup saved</h2><p>The file is in your Downloads. Keep it safe, or copy this text instead.</p>
     <textarea class="inp" id="b-text" readonly>${esc(data)}</textarea>
     <button class="btn primary" onclick="copyText('#b-text')">Copy</button>`);
 }
@@ -645,164 +625,62 @@ function copyText(sel){
   const el = $(sel); el.select();
   (navigator.clipboard ? navigator.clipboard.writeText(el.value) : Promise.reject()).then(()=>toast('Copied'), ()=>{ document.execCommand('copy'); toast('Copied'); });
 }
-function importSheet(){
-  sheet(`<h2>Import backup</h2><p>This replaces the data on this phone.</p>
-    <input type="file" accept=".json,application/json,text/plain" class="inp" onchange="readBackupFile(this.files[0])">
-    <div class="field"><label>Or paste backup text</label><textarea class="inp" id="i-text"></textarea></div>
-    <button class="btn primary" onclick="importText($('#i-text').value)">Import</button>`);
+function receiveSheet(){
+  sheet(`<h2>Restore backup</h2><p>Pick your backup file. Entries already on this phone are kept.</p>
+    <label class="btn primary" style="display:block;text-align:center">Choose file<input type="file" accept=".json,application/json,text/plain" hidden onchange="readShareFile(this.files[0])"></label>
+    <div class="field"><label>Or paste the text</label><textarea class="inp" id="i-text"></textarea></div>
+    <button class="btn" onclick="receiveText($('#i-text').value)">Add</button>`);
 }
-function readBackupFile(file){ if (!file) return; const r = new FileReader(); r.onload = () => importText(r.result); r.readAsText(file); }
-async function importText(txt){
+function explainBackup(){
+  info('Backup', 'Your data lives only on this phone. Save a backup now and then (send it to yourself on WhatsApp or save to Drive). On a new phone, open the app and tap Restore.');
+}
+function readShareFile(file){ if (!file) return; const r = new FileReader(); r.onload = () => receiveText(r.result); r.readAsText(file); }
+function mergeState(a, b){
+  if (!a) return b;
+  const deleted = new Set([...(a.deleted||[]), ...(b.deleted||[])]);
+  const map = new Map();
+  for (const t of [...a.tx, ...b.tx]){
+    if (deleted.has(t.id)) continue;
+    const old = map.get(t.id);
+    if (!old || (t.u||t.ts||0) > (old.u||old.ts||0)) map.set(t.id, t);
+  }
+  // Same record: the newer plan wins. Different records (a phone set up fresh): keep the older, original one.
+  const meta = (a.created||0) !== (b.created||0)
+    ? ((a.created||0) <= (b.created||0) ? a : b)
+    : ((b.updatedAt||0) > (a.updatedAt||0) ? b : a);
+  return {...meta, tx:[...map.values()], deleted:[...deleted]};
+}
+function receiveText(txt){
   let s;
-  try { const o = JSON.parse(txt); s = o.state || o; } catch(e) { return toast("That isn't a valid backup"); }
-  if (!s || !Array.isArray(s.tx) || !Array.isArray(s.plan) || !s.startMonth || !s.opening) return toast("That isn't a valid backup");
-  S = Object.assign({v:1, goal:10000, openingSpent:0, startDate:s.startMonth+'-01'}, s);
-  save(); closeSheet(); render(); toast('Backup imported');
-  if (live()) await pushEverything(true);
+  try { const o = JSON.parse(txt); s = o.state || o; } catch(e) { return toast("That isn't a Pocket Money file"); }
+  if (!s || !Array.isArray(s.tx) || !Array.isArray(s.plan) || !s.startMonth || !s.opening) return toast("That isn't a Pocket Money file");
+  const had = new Set(S ? S.tx.map(t=>t.id) : []);
+  S = mergeState(S, Object.assign({v:1, goal:10000, openingSpent:0, startDate:s.startMonth+'-01', deleted:[]}, s));
+  save(); closeSheet(); ui.tab = 'home'; render();
+  const added = S.tx.filter(t => !had.has(t.id)).length;
+  toast(added ? `${added} new ${added===1 ? 'entry' : 'entries'} added` : 'Already up to date');
 }
 
-/* ---------- Family sync: Firebase Auth (Google) + Firestore ----------
-   Everyone in the family signs in with the SAME Google account.
-   Data lives at families/{uid} (plan, opening balances) and families/{uid}/tx/{id}. */
-let fbReady = false, fdb = null, fuser = null, unsubs = [];
-function fbCfg(){ return FIREBASE_CONFIG || readJSON('pm_fbcfg'); }
-const live = () => !!(fuser && fdb);
-const famRef = () => fdb.collection('families').doc(fuser.uid);
-function metaOf(s){ const {tx, ...meta} = s; return {...meta, updatedAt:Date.now()}; }
-function loadScript(src){ return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
-async function initFirebase(){
-  const cfg = fbCfg();
-  if (!cfg) return false;
-  if (fbReady) return true;
-  try {
-    const b = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
-    await loadScript(b+'firebase-app-compat.js');
-    await loadScript(b+'firebase-auth-compat.js');
-    await loadScript(b+'firebase-firestore-compat.js');
-    firebase.initializeApp(cfg);
-    fdb = firebase.firestore();
-    fdb.enablePersistence({synchronizeTabs:true}).catch(()=>{});
-    firebase.auth().getRedirectResult().catch(e => toast(e.message));
-    firebase.auth().onAuthStateChanged(u => { fuser = u; if (u) startSync(); else stopSync(); render(); });
-    fbReady = true;
-  } catch(e) { toast('Could not load sync. Check your internet.'); }
-  return fbReady;
-}
-async function signIn(){
-  if (!fbCfg()) return syncSetup();
-  if (!await initFirebase()) return;
-  const provider = new firebase.auth.GoogleAuthProvider();
-  try { await firebase.auth().signInWithPopup(provider); }
-  catch(e) {
-    if (/popup|operation-not-supported|web-storage/.test(e.code||'')) {
-      try { await firebase.auth().signInWithRedirect(provider); } catch(e2) { toast(e2.message); }
-    } else if (e.code !== 'auth/cancelled-popup-request') toast(e.message);
-  }
-}
-function signOut(){ firebase.auth().signOut(); }
-function stopSync(){ unsubs.forEach(f=>f()); unsubs = []; }
-async function pushEverything(replace){
-  const fam = famRef();
-  if (replace){
-    const remote = await fam.collection('tx').get();
-    const keep = new Set(S.tx.map(t=>t.id));
-    const del = fdb.batch(); remote.forEach(d => { if (!keep.has(d.id)) del.delete(d.ref); }); await del.commit();
-  }
-  await fam.set(metaOf(S));
-  for (let i = 0; i < S.tx.length; i += 400){
-    const batch = fdb.batch();
-    S.tx.slice(i, i+400).forEach(t => batch.set(fam.collection('tx').doc(t.id), t));
-    await batch.commit();
-  }
-}
-async function startSync(){
-  stopSync();
-  const fam = famRef(), firstLink = readJSON('pm_linked_uid') !== fuser.uid;
-  try {
-    const meta = await fam.get();
-    if (meta.exists && meta.data().plan){
-      // Family already set up: take the shared plan; on first link, add this phone's entries to it.
-      const localTx = S && firstLink ? S.tx : [];
-      S = {...meta.data(), tx: S ? S.tx : []};
-      save();
-      if (localTx.length){ const b = fdb.batch(); localTx.forEach(t => b.set(fam.collection('tx').doc(t.id), t)); await b.commit(); }
-    } else if (S){
-      await pushEverything(false);
-    } else {
-      return toast('Set up the plan first, then sync');
-    }
-    writeJSON('pm_linked_uid', fuser.uid);
-  } catch(e) { return toast('Sync error: ' + (e.code || e.message)); }
-  unsubs.push(fam.onSnapshot(d => {
-    if (!d.exists || !d.data().plan || d.metadata.hasPendingWrites) return;
-    S = {...d.data(), tx: S ? S.tx : []}; save(); softRender();
-  }));
-  unsubs.push(fam.collection('tx').onSnapshot(q => {
-    if (!S) return;
-    const arr = []; q.forEach(d => arr.push(d.data()));
-    S.tx = arr; save(); softRender();
-  }, e => toast('Sync error: ' + e.code)));
-  render();
-}
 // Don't redraw a screen while someone is typing in it.
 function softRender(){ const a = document.activeElement; if (a && $('#screen').contains(a) && /INPUT|SELECT|TEXTAREA/.test(a.tagName)) return; render(); }
 function putTx(t){
+  t.u = Date.now();
   const i = S.tx.findIndex(x=>x.id===t.id);
   if (i >= 0) S.tx[i] = t; else S.tx.push(t);
   save();
-  if (live()) famRef().collection('tx').doc(t.id).set(t).catch(e => toast('Sync error: '+e.code));
 }
 function delTx(id){
-  S.tx = S.tx.filter(x=>x.id!==id); save();
-  if (live()) famRef().collection('tx').doc(id).delete().catch(e => toast('Sync error: '+e.code));
+  S.tx = S.tx.filter(x=>x.id!==id);
+  (S.deleted ||= []).push(id);
+  save();
 }
-function putMeta(){
-  S.updatedAt = Date.now(); save();
-  if (live()) famRef().set(metaOf(S)).catch(e => toast('Sync error: '+e.code));
-}
-function syncSetup(){
-  const cur = fbCfg();
-  sheet(`<h2>Family sync</h2>
-    <p>Everyone signs in with the <b>same Google account</b>. Entries sync to every phone.</p>
-    <p>One-time setup (free) — full steps are in README.md:</p>
-    <ol class="steps">
-      <li>Create a project at <b>console.firebase.google.com</b></li>
-      <li>Authentication → Sign-in method → enable <b>Google</b></li>
-      <li>Firestore Database → Create → paste these Rules:</li>
-    </ol>
-    <pre>rules_version = '2';
-service cloud.firestore {
-  match /databases/{db}/documents {
-    match /families/{uid}/{doc=**} {
-      allow read, write: if request.auth.uid == uid;
-    }
-  }
-}</pre>
-    <ol class="steps" start="4"><li>Project settings → Your apps → Web <b>&lt;/&gt;</b> → copy <code>firebaseConfig</code> and paste below</li></ol>
-    <textarea class="inp" id="fb-cfg" placeholder="{ apiKey: &quot;...&quot;, authDomain: &quot;...&quot;, projectId: &quot;...&quot;, ... }">${cur ? esc(JSON.stringify(cur, null, 2)) : ''}</textarea>
-    <button class="btn primary" onclick="saveSyncCfg()">Save & sign in</button>
-    ${cur && !FIREBASE_CONFIG ? `<button class="btn danger" onclick="localStorage.removeItem('pm_fbcfg');location.reload()">Remove sync setup</button>` : ''}`);
-}
-function parseCfg(txt){
-  const m = txt.match(/\{[\s\S]*\}/);
-  if (!m) return null;
-  const json = m[0].replace(/\/\/.*$/gm,'').replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g,'$1"$2":').replace(/'/g,'"').replace(/,\s*}/g,'}');
-  try { const o = JSON.parse(json); return o.apiKey && o.projectId ? o : null; } catch(e) { return null; }
-}
-function saveSyncCfg(){
-  const cfg = parseCfg($('#fb-cfg').value);
-  if (!cfg) return toast('Paste the whole firebaseConfig { ... }');
-  writeJSON('pm_fbcfg', cfg);
-  if (fbReady) return location.reload();   // a different project needs a fresh start
-  closeSheet(); signIn();
-}
+function putMeta(){ S.updatedAt = Date.now(); save(); }
 
 /* ---------- start ---------- */
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js');
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => P.theme==='system' && render());
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S) softRender(); }); // roll over to a new month
 render();
-if (fbCfg()) initFirebase();
 </script>
 </body>
 </html>

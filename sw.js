@@ -1,6 +1,6 @@
 // Offline support: the app works with no internet once opened.
 // Bump VERSION when you upload a new index.html so phones pick it up.
-const VERSION = 'pm-v1';
+const VERSION = 'pm-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
